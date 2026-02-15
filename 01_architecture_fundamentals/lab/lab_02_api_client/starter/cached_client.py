@@ -41,6 +41,7 @@ class CachedHFClient(HuggingFaceClient):
         cache_key = self._cache_key(model_id, payload)
         cache_file = self.cache_dir / f"{cache_key}.json"
 
+
         # =================================================================
         # TODO 1: Check cache — return cached response if available
         #
@@ -51,6 +52,10 @@ class CachedHFClient(HuggingFaceClient):
         # =================================================================
 
         # Your code here (cache check)
+        if use_cache and cache_file.exists():
+            print("[Cache HIT] Using cached response")
+            cached_response = cache_file.read_text(encoding="utf-8")
+            return json.loads(cached_response)
 
         # =================================================================
         # TODO 2: Make the API call (cache miss)
@@ -61,7 +66,8 @@ class CachedHFClient(HuggingFaceClient):
         # =================================================================
 
         # Your code here (API call)
-        result = None  # Replace with: super().query(model_id, payload)
+        print("[Cache MISS] Calling API...")
+        result = super().query(model_id, payload) # Replace with: super().query(model_id, payload)
 
         # =================================================================
         # TODO 3: Write result to cache
@@ -71,6 +77,8 @@ class CachedHFClient(HuggingFaceClient):
         # =================================================================
 
         # Your code here (cache write)
+        cache_content = json.dumps(result, ensure_ascii=False)
+        cache_file.write_text(cache_content, encoding="utf-8")
 
         return result
 
@@ -80,20 +88,19 @@ if __name__ == "__main__":
     client = CachedHFClient(token=get_api_token())
 
     prompt_payload = {
-        "inputs": "What is retrieval-augmented generation?",
-        "parameters": {
-            "max_new_tokens": 100,
-            "temperature": 0.3,
-            "return_full_text": False,
-        },
+        "messages": [
+            {"role": "user", "content": "What is retrieval-augmented generation?"}
+        ],
+        "max_tokens": 100,
+        "temperature": 0.3,
     }
 
     print("--- First call (should be Cache MISS) ---")
-    result1 = client.query("mistralai/Mistral-7B-Instruct-v0.3", prompt_payload)
+    result1 = client.query("mistralai/mistral-7b-instruct", prompt_payload)
     if result1:
-        print(result1[0]["generated_text"][:200])
+        print(result1["choices"][0]["message"]["content"][:200])
 
     print("\n--- Second call (should be Cache HIT) ---")
-    result2 = client.query("mistralai/Mistral-7B-Instruct-v0.3", prompt_payload)
+    result2 = client.query("mistralai/mistral-7b-instruct", prompt_payload)
     if result2:
-        print(result2[0]["generated_text"][:200])
+        print(result2["choices"][0]["message"]["content"][:200])

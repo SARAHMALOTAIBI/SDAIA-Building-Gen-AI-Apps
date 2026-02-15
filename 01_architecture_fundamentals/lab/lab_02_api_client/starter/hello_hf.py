@@ -16,46 +16,66 @@ load_dotenv()
 
 def get_api_token():
     """Retrieve API token with validation."""
-    token = os.getenv("HUGGINGFACE_API_TOKEN")
+    token = os.getenv("OPENROUTER_API_KEY")
     if not token:
         raise EnvironmentError(
-            "HUGGINGFACE_API_TOKEN not found. "
-            "Create a .env file with your token or set the environment variable."
+            "OPENROUTER_API_KEY not found. "
+            "Create a .env file with your key."
         )
-    if not token.startswith("hf_"):
+    if not token.startswith("sk-"):
         raise ValueError(
-            "Invalid Hugging Face token format. Token should start with 'hf_'."
+            "Invalid OpenRouter key format. Should start with 'sk-'."
         )
     return token
 
 
 # --- Configuration ---
-API_URL = "https://api-inference.huggingface.co/models/"
-MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
+API_URL = "https://openrouter.ai/api/v1/chat/completions"
+MODEL_ID = "mistralai/mistral-7b-instruct"
+
+
 TOKEN = get_api_token()
-HEADERS = {"Authorization": f"Bearer {TOKEN}"}
+
+HEADERS = {
+    "Authorization": f"Bearer {TOKEN}",
+    "Content-Type": "application/json"
+}
 
 
 # =====================================================================
 # TODO (Step 2): Make your first API call
 #
-# Use requests.post() to send a request to the Hugging Face Inference API.
+# Use requests.post() to send a request to the API.
 #
 # Hints:
-#   - URL: f"{API_URL}{MODEL_ID}"
+#   - URL: API_URL
 #   - Pass `headers=HEADERS`
-#   - Pass a JSON body: {"inputs": prompt, "parameters": {...}}
-#   - Key parameters: max_new_tokens=150, temperature=0.7, return_full_text=False
+#   - Pass a JSON body with model + messages
+#   - Key parameters: max_tokens=150, temperature=0.7
 #   - Call response.raise_for_status() to catch HTTP errors
 #   - Parse with response.json()
-#   - The generated text is at result[0]["generated_text"]
+#   - Extract text from result["choices"][0]["message"]["content"]
 # =====================================================================
 
 prompt = "Explain what a vector database is in one paragraph:"
 
-# Your code here:
-# response = requests.post(...)
-# response.raise_for_status()
-# result = response.json()
-# print("Generated Text:")
-# print(result[0]["generated_text"])
+response = requests.post(
+    API_URL,
+    headers=HEADERS,
+    json={
+        "model": MODEL_ID,
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 150,
+        "temperature": 0.7
+    },
+    timeout=60
+)
+
+response.raise_for_status()
+
+result = response.json()
+
+print("Generated Text:")
+print(result["choices"][0]["message"]["content"])

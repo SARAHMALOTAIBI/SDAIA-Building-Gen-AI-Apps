@@ -1,5 +1,6 @@
 import logging
 from dataclasses import dataclass, field
+from urllib import response
 # from litellm import completion_cost
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,34 @@ class CostTracker:
         # 2. Extract usage stats from response
         # 3. Calculate cost (use litellm.completion_cost or fallback)
         # 4. create StepCost and add to query
-        pass
+
+        if not self._current_query:
+            logger.warning("No active query to log completion for.")
+            return
+
+        usage = getattr(response, "usage", None)
+
+        if usage:
+            input_tokens = getattr(usage, "prompt_tokens", 0)
+            output_tokens = getattr(usage, "completion_tokens", 0)
+        else:
+            input_tokens = 0
+            output_tokens = 0
+
+        model = getattr(response, "model", "unknown")
+
+        cost_usd = (input_tokens + output_tokens) * 0.00001
+
+        step_cost = StepCost(
+            step_number=step_number,
+            model=model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cost_usd=cost_usd,
+            is_tool_call=is_tool_call
+        )
+
+        self._current_query.add_step(step_cost)
 
     def end_query(self):
         if self._current_query:
@@ -56,5 +84,11 @@ class CostTracker:
 
     def print_cost_breakdown(self):
         # TODO: Print detailed cost breakdown
-        pass
-
+        for query_cost in self.queries:
+            print(f"Query: {query_cost.query}")
+            for step in query_cost.steps:
+                tool_call_str = " (Tool Call)" if step.is_tool_call else ""
+                print(f"  Step {step.step_number}: Model={step.model}, "
+                      f"Input Tokens={step.input_tokens}, Output Tokens={step.output_tokens}, "
+                      f"Cost=${step.cost_usd:.4f}{tool_call_str}")
+            print(f"Total Cost for Query: ${query_cost.total_cost_usd:.4f}\n")

@@ -1,7 +1,7 @@
 """
-Lab 2: Agent Core — OpenAI Integration with Tool Calling
-==========================================================
-Wire the calculator tool into OpenAI's Chat Completions API.
+Lab 2: Agent Core — OpenRouter Integration with Tool Calling
+============================================================
+Wire the calculator tool into OpenRouter's Chat Completions API.
 Implements the two-call pattern:
   1. Send messages + tool schemas → get tool_calls
   2. Execute tools → send results back → get final answer
@@ -20,15 +20,23 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# OpenRouter client (OpenAI-compatible)
+client = OpenAI(
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+    base_url="https://openrouter.ai/api/v1",
+    default_headers={
+        "HTTP-Referer": "http://localhost",
+        "X-Title": "Calculator Agent"
+    }
+)
 
 
 def get_ai_response_with_tools(
     messages: List[Dict[str, Any]],
-    model: str = "gpt-4o-mini"
+    model: str = "openai/gpt-4o-mini"
 ) -> Dict[str, Any]:
     """
-    Sends messages to OpenAI, handling tool calls if returned.
+    Sends messages to OpenRouter, handling tool calls if returned.
 
     The two-call pattern:
     1. First API call: send messages + tool schemas
@@ -37,7 +45,7 @@ def get_ai_response_with_tools(
 
     Args:
         messages: The conversation history
-        model: The OpenAI model to use
+        model: The model to use (must support tool calling)
 
     Returns:
         {"response_text": str, "tool_results": list}
@@ -53,7 +61,7 @@ def get_ai_response_with_tools(
             temperature=0.1             # Low temp for deterministic tool use
         )
     except Exception as e:
-        logger.error(f"OpenAI API call failed: {e}")
+        logger.error(f"OpenRouter API call failed: {e}")
         return {
             "response_text": "I'm having trouble connecting. Please try again.",
             "tool_results": []
@@ -72,6 +80,12 @@ def get_ai_response_with_tools(
         #     "content": response_message.content,
         #     "tool_calls": response_message.tool_calls
         # })
+        messages.append({
+    "role": "assistant",
+    "content": response_message.content,
+    "tool_calls": response_message.tool_calls
+})
+
 
         # TODO: Loop through each tool_call and:
         # 1. Extract tool_name from tool_call.function.name
@@ -85,12 +99,48 @@ def get_ai_response_with_tools(
         #        "content": json.dumps(result)
         #    })
         # 5. Collect results in tool_results list
+        for tool_call in response_message.tool_calls:
+
+        
+            tool_name = tool_call.function.name
+
+            
+            try:
+                arguments = json.loads(tool_call.function.arguments)
+            except json.JSONDecodeError:
+                logger.error("Invalid JSON in tool arguments.")
+                continue
+
+            result = execute_tool(tool_name, arguments)
+
+            
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tool_call.id,
+                "content": json.dumps(result)
+            })
+
+            
+            tool_results.append({
+                "tool": tool_name,
+                "arguments": arguments,
+                "result": result
+            })
+
 
         # TODO: Make the second API call with updated messages
         # second_response = client.chat.completions.create(
         #     model=model, messages=messages, temperature=0.1
         # )
         # response_text = second_response.choices[0].message.content
+        second_response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.1
+        )
+
+        response_text = second_response.choices[0].message.content
+
 
         response_text = "Tool calling not yet implemented."  # Remove this line
     else:

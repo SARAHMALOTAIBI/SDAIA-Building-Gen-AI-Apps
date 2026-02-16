@@ -45,7 +45,10 @@ class ToolRegistry:
         # TODO: Store the tool in self._tools using tool.name as key
         # TODO: Create a ToolRateLimiter for this tool in self._limiters
         # TODO: Log the registration
-        pass
+        self._tools[tool.name] = tool
+        self._limiters[tool.name] = ToolRateLimiter(calls_per_minute)
+        logger.info(f"Registered tool '{tool.name}' with rate limit {calls_per_minute} calls/minute")
+
 
     def get_tool(self, name: str) -> Optional[BaseTool]:
         """Returns a tool by name, or None if not found."""
@@ -60,7 +63,8 @@ class ToolRegistry:
         """
         # TODO: Return a list of get_schema() for each registered tool
         # Hint: [tool.get_schema() for tool in self._tools.values()]
-        pass
+        return [tool.get_schema() for tool in self._tools.values()]
+    
 
     def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -77,7 +81,20 @@ class ToolRegistry:
         # TODO: Look up the tool (return error dict if not found)
         # TODO: Check rate limiter (return error dict if rate limited)
         # TODO: Try to execute the tool, catch exceptions
-        pass
+        tool = self.get_tool(tool_name)
+        if not tool:
+            return {"success": False, "result": None, "error": f"Tool '{tool_name}' not found."}
+
+        limiter = self._limiters.get(tool_name)
+        if limiter and not limiter.is_allowed():
+            return {"success": False, "result": None, "error": f"Rate limit exceeded for tool '{tool_name}'."}
+
+        try:
+            result = tool.execute(arguments)
+            return {"success": True, "result": result, "error": None}
+        except Exception as e:
+            logger.exception(f"Error executing tool '{tool_name}': {e}")
+            return {"success": False, "result": None, "error": str(e)}
 
     def execute_secure(
         self,
@@ -101,7 +118,15 @@ class ToolRegistry:
         #   missing = [p for p in tool.permissions if p not in user_permissions]
         #   If missing, return {"success": False, "error": "Access Denied. Missing: ..."}
         # TODO: If permissions OK, delegate to self.execute()
-        pass
+        tool = self.get_tool(tool_name)
+        if not tool:
+            return {"success": False, "result": None, "error": f"Tool '{tool_name}' not found."}
+
+        missing = [p for p in tool.permissions if p not in user_permissions]
+        if missing:
+            return {"success": False, "result": None, "error": f"Access Denied. Missing permissions: {missing}"}
+
+        return self.execute(tool_name, arguments)
 
 
 # =============================================================================

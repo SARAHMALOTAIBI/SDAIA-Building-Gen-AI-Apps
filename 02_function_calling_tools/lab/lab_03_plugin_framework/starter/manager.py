@@ -47,10 +47,14 @@ class ToolRateLimiter:
 
             # TODO: Refill tokens based on elapsed time
             # self.allowance += time_passed * (self.calls_per_minute / 60.0)
+            refill_rate = self.calls_per_minute / 60.0
+            self.allowance += time_passed * refill_rate
 
             # TODO: Cap at maximum
             # if self.allowance > self.calls_per_minute:
             #     self.allowance = self.calls_per_minute
+            if self.allowance > self.calls_per_minute:
+                self.allowance = self.calls_per_minute
 
             # TODO: Check if we have a token to spend
             # if self.allowance < 1:
@@ -58,7 +62,10 @@ class ToolRateLimiter:
             # self.allowance -= 1
             # return True
 
-            pass
+            if self.allowance < 1:
+                return False
+            self.allowance -= 1
+            return True
 
 
 # Quick test

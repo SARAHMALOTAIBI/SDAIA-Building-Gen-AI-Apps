@@ -10,6 +10,7 @@ Implement a production-ready calculator tool with:
 import json
 import logging
 import functools
+from time import time
 from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -86,7 +87,22 @@ def execute_calculation(operation: str, operand_a: float, operand_b: float) -> D
         # - "divide": operand_a / operand_b (handle division by zero!)
         # - "pow": operand_a ** operand_b
         # - anything else: set error to "Unsupported operation: {operation}"
-        pass
+        if operation == "add": 
+            result = operand_a + operand_b
+        elif operation == "subtract":
+            result = operand_a - operand_b
+        elif operation == "multiply":
+            result = operand_a * operand_b
+        elif operation == "divide":
+            if operand_b == 0:
+                error = "Division by zero is not allowed."
+            else:
+                result = operand_a / operand_b
+        elif operation == "pow":
+            result = operand_a ** operand_b
+        else:
+            error = f"Unsupported operation: {operation}"
+
     except Exception as e:
         error = f"Calculation error: {str(e)}"
 
@@ -135,6 +151,13 @@ def resilient_api_call(max_retries: int = 2, timeout_seconds: int = 10):
             try:
                 return func(*args, **kwargs)
             except Exception as e:
+                if max_retries > 0:
+                    logger.warning(f"API call failed: {str(e)}. Retrying...")
+                    # Implement exponential backoff here (e.g., time.sleep(2 ** attempt))   
+                    time.sleep(2 ** (max_retries - 1))  # Exponential backoff
+                    return wrapper(*args, **kwargs)  # Retry the call
+                else:
+                    logger.error(f"API call failed after retries: {str(e)}")
                 return {"success": False, "error": f"Service error: {str(e)}"}
         return wrapper
     return decorator

@@ -47,7 +47,11 @@ class PathSanitizer:
         # if not abs_target.startswith(abs_base):
         #     raise SecurityError(f"Path traversal blocked: {target_path}")
         # return abs_target
-        pass
+        abs_base = os.path.abspath(base_dir)
+        abs_target = os.path.abspath(os.path.join(base_dir, target_path))   
+        if not abs_target.startswith(abs_base):
+            raise SecurityError(f"Path traversal blocked: {target_path}")
+        return abs_target
 
 
 # Quick test

@@ -65,7 +65,18 @@ class ListFilesTool(BaseTool):
         # TODO: List files with os.listdir(safe_path)
         # TODO: Return structured result
         # TODO: Catch SecurityError and other exceptions
-        pass
+        try:
+            # Validate the path
+            safe_path = PathSanitizer.validate_safe_path(self.BASE_DIR, path)
+
+            # List files in the directory
+            files = os.listdir(safe_path)
+
+            return {"success": True, "result": files, "error": None}
+        except SecurityError as se:
+            return {"success": False, "result": None, "error": f"Security error: {str(se)}"}
+        except Exception as e:
+            return {"success": False, "result": None, "error": f"Error: {str(e)}"}
 
 
 # Quick test
